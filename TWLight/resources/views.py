@@ -60,6 +60,25 @@ class PartnersDetailView(DetailView):
             partner=partner, status=Application.SENT).count()
 
         context['total_apps_approved_or_sent'] = context['total_apps_approved'] + context['total_apps_sent']
+        
+        # This if else block supports the template with the number of accounts available 
+        partner_streams = Stream.objects.filter(partner=partner)
+        if partner_streams.count() > 0:
+            context['total_accounts_available_current'] = {}
+            for stream in partner_streams:
+                context['total_apps_approved_or_sent_stream'] = User.objects.filter(
+                                      editor__applications__partner=partner,
+                                      editor__applications__status__in=(Application.APPROVED, Application.SENT),
+                                      editor__applications__specific_stream=stream).count()
+                
+                total_accounts_available = stream.accounts_available
+                context['total_accounts_available'] = total_accounts_available
+                
+                context['total_accounts_available_current'][stream.name] = context['total_accounts_available'] - context['total_apps_approved_or_sent_stream']
+        else:
+            context['total_apps_approved_or_sent_stream'] = None
+
+            context['negation_total_apps_approved_or_sent'] = - context['total_apps_approved_or_sent']
 
         context['unique_users'] = User.objects.filter(
             editor__applications__partner=partner).distinct().count()
