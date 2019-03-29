@@ -1,5 +1,6 @@
 - model: resources.partner
   pk: 8
   fields:
-    company_name: Foreign Affairs
-    company_location: United States of America
+    company_name: "Foreign Affairs"
+    company_location: "US"
+    date_created: "2019-01-01"
