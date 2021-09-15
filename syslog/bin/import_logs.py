@@ -61,7 +61,7 @@ http.client._MAXHEADERS = 1000
 ##
 
 STATIC_EXTENSIONS = set((
-    'gif jpg jpeg png bmp ico svg svgz ttf otf eot woff woff2 class swf css js xml webp'
+    'gif jpg jpeg png bmp ico svg svgz ttf otf eot woff woff2 class swf css js xml webp map'
 ).split())
 
 STATIC_FILES = set((
@@ -80,6 +80,7 @@ DOWNLOAD_EXTENSIONS = set((
 # https://github.com/matomo-org/device-detector/blob/master/regexes/bots.yml
 # user agents must be lowercase
 EXCLUDED_USER_AGENTS = (
+    'apache-httpclient',
     'adsbot-google',
     'ask jeeves',
     'baidubot',
@@ -100,6 +101,7 @@ EXCLUDED_USER_AGENTS = (
     'netcraftsurvey',
     'panopta',
     'pingdom.com_bot_',
+    'python-requests/',
     'robot',
     'spider',
     'surveybot',
@@ -2437,7 +2439,7 @@ class Parser:
                 is_robot=False,
                 is_error=False,
                 is_redirect=False,
-                args={},
+                args=format.get('args'),
             )
 
             if config.options.regex_group_to_page_cvars_map:

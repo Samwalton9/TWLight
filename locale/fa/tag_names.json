@@ -1,0 +1,26 @@
+{
+	"@metadata": {
+		"authors": [
+			"Darafsh",
+			"Jeeputer",
+			"Mardetanha",
+			"درفش کاویانی"
+		]
+	},
+	"languages-and-literature_tag": "زبان‌ها و ادبیات",
+	"multidisciplinary_tag": "چندرشته‌ای",
+	"physical-sciences_tag": "علوم فیزیک",
+	"music_tag": "موسیقی",
+	"art_tag": "هنر",
+	"business-and-economics_tag": "اقتصاد و تجارت",
+	"law_tag": "حقوق",
+	"education_tag": "آموزش",
+	"philosophy-and-religion_tag": "فلسفه و مذهب",
+	"social-sciences_tag": "علوم اجتماعی",
+	"history_tag": "تاریخ",
+	"culture_tag": "فرهنگ",
+	"life-sciences_tag": "علوم زندگی",
+	"health-sciences_tag": "علوم مربوط به سلامتی",
+	"earth-sciences_tag": "علوم زمینی",
+	"technology_tag": "فناوری"
+}

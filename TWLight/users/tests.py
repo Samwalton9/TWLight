@@ -34,6 +34,7 @@ from .helpers.wiki_list import WIKIS, LANGUAGE_CODES
 from .factories import EditorFactory, UserFactory
 from .groups import get_coordinators, get_restricted
 from .models import UserProfile, Editor, Authorization
+from .views import MyLibraryView
 
 from TWLight.users.helpers.editor_data import (
     editor_valid,
@@ -355,129 +356,6 @@ class ViewsTestCase(TestCase):
         )
         app.refresh_from_db()
         self.assertNotIn("Withdraw", response.render().content.decode("utf-8"))
-
-    def test_my_library_page_has_authorizations(self):
-
-        # a coordinator with a session.
-        coordinator = EditorCraftRoom(self, Terms=True, Coordinator=True)
-        partner1 = PartnerFactory(
-            authorization_method=Partner.PROXY, status=Partner.AVAILABLE
-        )
-        app1 = ApplicationFactory(
-            status=Application.PENDING, editor=self.user_editor.editor, partner=partner1
-        )
-        partner1.coordinator = coordinator.user
-        partner1.save()
-        # coordinator will update the status
-        self.client.post(
-            reverse("applications:evaluate", kwargs={"pk": app1.pk}),
-            data={"status": Application.APPROVED},
-            follow=True,
-        )
-
-        partner2 = PartnerFactory(
-            authorization_method=Partner.BUNDLE, status=Partner.AVAILABLE
-        )
-        partner2.coordinator = coordinator.user
-        partner2.save()
-
-        partner3 = PartnerFactory(
-            authorization_method=Partner.CODES, status=Partner.AVAILABLE
-        )
-        app3 = ApplicationFactory(
-            status=Application.PENDING, editor=self.user_editor.editor, partner=partner3
-        )
-        partner3.coordinator = coordinator.user
-        partner3.save()
-        # coordinator will update the status
-        self.client.post(
-            reverse("applications:evaluate", kwargs={"pk": app3.pk}),
-            data={"status": Application.APPROVED},
-            follow=True,
-        )
-        self.client.post(
-            reverse("applications:evaluate", kwargs={"pk": app3.pk}),
-            data={"status": Application.SENT},
-            follow=True,
-        )
-
-        partner4 = PartnerFactory(
-            authorization_method=Partner.EMAIL, status=Partner.AVAILABLE
-        )
-        app4 = ApplicationFactory(
-            status=Application.PENDING, editor=self.user_editor.editor, partner=partner4
-        )
-        partner4.coordinator = coordinator.user
-        partner4.save()
-        # coordinator will update the status
-        self.client.post(
-            reverse("applications:evaluate", kwargs={"pk": app4.pk}),
-            data={"status": Application.NOT_APPROVED},
-            follow=True,
-        )
-
-        partner5 = PartnerFactory(
-            authorization_method=Partner.LINK, status=Partner.AVAILABLE
-        )
-        app5 = ApplicationFactory(
-            status=Application.PENDING, editor=self.user_editor.editor, partner=partner5
-        )
-        partner5.coordinator = coordinator.user
-        partner5.save()
-        # coordinator will update the status
-        self.client.post(
-            reverse("applications:evaluate", kwargs={"pk": app5.pk}),
-            data={"status": Application.NOT_APPROVED},
-            follow=True,
-        )
-
-        partner6 = PartnerFactory(
-            authorization_method=Partner.BUNDLE, status=Partner.AVAILABLE
-        )
-        partner6.coordinator = coordinator.user
-        partner6.save()
-
-        self.editor1.update_bundle_authorization()
-
-        factory = RequestFactory()
-        request = factory.get(reverse("users:my_library"))
-        request.user = self.user_editor
-        response = views.CollectionUserView.as_view()(request)
-
-        # Proxy and bundle checks
-        proxy_partners = [partner1]
-        bundle_partners = [partner2, partner6]
-        response_proxy_bundle_auths = response.context_data[
-            "proxy_bundle_authorizations"
-        ]
-        response_proxy_bundle_partners = []
-        for collection in response_proxy_bundle_auths:
-            self.assertEqual(collection["authorization"].user, self.user_editor)
-            partners = collection["authorization"].partners.all()
-            for partner in partners:
-                response_proxy_bundle_partners.append(partner)
-
-        # Check for proxy auths
-        for partner in proxy_partners:
-            self.assertTrue(partner in response_proxy_bundle_partners)
-
-        # Check for bundle auths
-        for partner in bundle_partners:
-            self.assertTrue(partner in response_proxy_bundle_partners)
-
-        # Manual checks
-        manual_partners = [partner3]
-        response_manual_auths = response.context_data["manual_authorizations"]
-        response_manual_partners = []
-        for collection in response_manual_auths:
-            self.assertEqual(collection["authorization"].user, self.user_editor)
-            partners = collection["authorization"].partners.all()
-            for partner in partners:
-                response_manual_partners.append(partner)
-
-        # Check for manual auths
-        for partner in manual_partners:
-            self.assertTrue(partner in response_manual_partners)
 
     def test_return_authorization(self):
         # Simulate a valid user trying to return their access
@@ -1052,8 +930,36 @@ class EditorModelTestCase(TestCase):
         )
         self.assertFalse(valid)
 
+        # Oauth says the account is too new, but global_userinfo says it's fine
+        global_userinfo["editcount"] = 500
+        self.editor.update_editcount(global_userinfo["editcount"])
+        enough_edits = editor_enough_edits(self.editor.wp_editcount)
+        identity["registered"] = datetime.today().strftime("%Y%m%d%H%M%S")
+        registered = editor_reg_date(identity, global_userinfo)
+        account_old_enough = editor_account_old_enough(registered)
+        valid = editor_valid(
+            enough_edits, account_old_enough, not_blocked, ignore_wp_blocks
+        )
+        self.assertTrue(valid)
+
+        # Oauth says the account is fine, but global_userinfo says it's too new
+        global_userinfo["editcount"] = 500
+        global_userinfo["registration"] = datetime.today()
+        self.editor.update_editcount(global_userinfo["editcount"])
+        enough_edits = editor_enough_edits(self.editor.wp_editcount)
+        identity["registered"] = (datetime.today() - timedelta(days=365)).strftime(
+            "%Y%m%d%H%M%S"
+        )
+        registered = editor_reg_date(identity, global_userinfo)
+        account_old_enough = editor_account_old_enough(registered)
+        valid = editor_valid(
+            enough_edits, account_old_enough, not_blocked, ignore_wp_blocks
+        )
+        self.assertTrue(valid)
+
         # Account created too recently
         global_userinfo["editcount"] = 500
+        global_userinfo["registration"] = datetime.today()
         self.editor.update_editcount(global_userinfo["editcount"])
         enough_edits = editor_enough_edits(self.editor.wp_editcount)
         identity["registered"] = datetime.today().strftime("%Y%m%d%H%M%S")
@@ -1066,6 +972,7 @@ class EditorModelTestCase(TestCase):
 
         # Edge case: this shouldn't work.
         almost_6_months_ago = datetime.today() - timedelta(days=181)
+        global_userinfo["registration"] = almost_6_months_ago
         identity["registered"] = almost_6_months_ago.strftime("%Y%m%d%H%M%S")
         registered = editor_reg_date(identity, global_userinfo)
         account_old_enough = editor_account_old_enough(registered)
@@ -1076,6 +983,7 @@ class EditorModelTestCase(TestCase):
 
         # Edge case: this should work.
         almost_6_months_ago = datetime.today() - timedelta(days=182)
+        global_userinfo["registration"] = almost_6_months_ago
         identity["registered"] = almost_6_months_ago.strftime("%Y%m%d%H%M%S")
         registered = editor_reg_date(identity, global_userinfo)
         account_old_enough = editor_account_old_enough(registered)
@@ -1724,3 +1632,473 @@ class ManagementCommandsTestCase(TestCase):
         self.editor.refresh_from_db()
 
         self.assertFalse(self.editor.wp_bundle_eligible)
+
+
+class MyLibraryViewsTest(TestCase):
+    @classmethod
+    @wrap_testdata
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.bundle_partner_1 = PartnerFactory(
+            authorization_method=Partner.BUNDLE,
+            new_tags={"tags": ["earth-sciences_tag"]},
+        )
+        cls.bundle_partner_2 = PartnerFactory(
+            authorization_method=Partner.BUNDLE, new_tags={"tags": ["art_tag"]}
+        )
+
+        cls.bundle_partner_3 = PartnerFactory(authorization_method=Partner.BUNDLE)
+        cls.bundle_partner_3.new_tags = {"tags": ["art_tag"]}
+        cls.bundle_partner_3.save()
+
+        cls.bundle_partner_4 = PartnerFactory(authorization_method=Partner.BUNDLE)
+        cls.bundle_partner_4.new_tags = {"tags": ["multidisciplinary_tag"]}
+        cls.bundle_partner_4.save()
+
+        cls.proxy_partner_1 = PartnerFactory(authorization_method=Partner.PROXY)
+        cls.proxy_partner_1.new_tags = {"tags": ["earth-sciences_tag"]}
+        cls.proxy_partner_1.save()
+
+        cls.proxy_partner_2 = PartnerFactory(authorization_method=Partner.PROXY)
+        cls.proxy_partner_2.new_tags = {"tags": ["earth-sciences_tag"]}
+        cls.proxy_partner_2.save()
+
+        cls.proxy_partner_3 = PartnerFactory(authorization_method=Partner.PROXY)
+        cls.proxy_partner_3.new_tags = {"tags": ["multidisciplinary_tag"]}
+        cls.proxy_partner_3.save()
+
+        cls.user_coordinator = UserFactory(username="Jon Snow")
+        cls.editor = EditorFactory()
+        cls.editor.wp_bundle_eligible = True
+        cls.editor.save()
+        get_coordinators().user_set.add(cls.user_coordinator)
+
+    def test_user_collections(self):
+        """
+        Tests that only user collections are shown
+        """
+        app_bundle_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_2 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_2,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_3 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_3,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_4 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_4,
+            sent_by=self.user_coordinator,
+        )
+
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(self.bundle_partner_1.company_name), content)
+        self.assertIn(escape(self.bundle_partner_2.company_name), content)
+        self.assertIn(escape(self.bundle_partner_3.company_name), content)
+        self.assertIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertIn(escape(self.bundle_partner_4.company_name), content)
+        # Even though this partner is not visible, it still appears in the HTML
+        # render
+        self.assertIn(escape(self.proxy_partner_2.company_name), content)
+        self.assertIn(escape(self.proxy_partner_3.company_name), content)
+
+    def test_user_collections_show_expiry_date_extend(self):
+        """
+        Tests that the expiry date and the Extend button are shown
+        """
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        someday = date.today() + timedelta(days=60)
+        authorization = Authorization.objects.get(
+            user=self.editor.user, partners=self.proxy_partner_1
+        )
+        authorization.date_expires = someday
+        authorization.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        someday_fmt = datetime.strftime(someday, "%b %d, %Y")
+        self.assertIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertIn(someday_fmt, content)
+        self.assertIn("Extend", content)
+
+    def test_user_collections_show_expiry_date_renew(self):
+        """
+        Tests that the expiry date and the Renew button are shown
+        """
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        someday = date.today() - timedelta(days=60)
+        authorization = Authorization.objects.get(
+            user=self.editor.user, partners=self.proxy_partner_1
+        )
+        authorization.date_expires = someday
+        authorization.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        someday_fmt = datetime.strftime(someday, "%b %d, %Y")
+        self.assertIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertIn(someday_fmt, content)
+        self.assertIn("Renew", content)
+
+    def test_user_collections_show_expiry_date_not_shown(self):
+        """
+        Tests that the expiry date is not shown
+        """
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        authorization = Authorization.objects.get(
+            user=self.editor.user, partners=self.proxy_partner_1
+        )
+        authorization.date_expires = None
+        authorization.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertNotIn("Expiry date: ", content)
+
+    def test_user_collections_has_open_application(self):
+        """
+        Tests that the Go to application button is shown when an application is open
+        """
+
+        old_app = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.PENDING,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        authorization = Authorization.objects.get(
+            user=self.editor.user, partners=self.proxy_partner_1
+        )
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertIn("Go to application", content)
+
+    def test_collection_filters_art_tag(self):
+        """
+        Tests that only user collections that match the filter are shown
+        """
+        app_bundle_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_2 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_2,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_3 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_3,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_4 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_4,
+            sent_by=self.user_coordinator,
+        )
+
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        url_with_art_tag_param = "{url}?tags=art_tag".format(url=url)
+        request = factory.get(url_with_art_tag_param)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(self.bundle_partner_2.company_name), content)
+        self.assertIn(escape(self.bundle_partner_3.company_name), content)
+        # Multidisciplinary partners should also appear when filtering
+        self.assertIn(escape(self.bundle_partner_4.company_name), content)
+        self.assertIn(escape(self.proxy_partner_3.company_name), content)
+
+        self.assertNotIn(escape(self.bundle_partner_1.company_name), content)
+        self.assertNotIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertNotIn(escape(self.proxy_partner_2.company_name), content)
+
+    def test_collection_filters_earth_sciences_tag(self):
+        """
+        Tests that only user collections that match the filter are shown
+        """
+        app_bundle_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_2 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_2,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_3 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_3,
+            sent_by=self.user_coordinator,
+        )
+
+        app_bundle_partner_4 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.bundle_partner_4,
+            sent_by=self.user_coordinator,
+        )
+
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=self.proxy_partner_1,
+            sent_by=self.user_coordinator,
+        )
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        url_with_earth_sciences_tag_param = "{url}?tags=earth-sciences_tag".format(
+            url=url
+        )
+        request = factory.get(url_with_earth_sciences_tag_param)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertNotIn(escape(self.bundle_partner_2.company_name), content)
+        self.assertNotIn(escape(self.bundle_partner_3.company_name), content)
+        # Multidisciplinary partners should also appear when filtering
+        self.assertIn(escape(self.bundle_partner_4.company_name), content)
+        self.assertIn(escape(self.proxy_partner_3.company_name), content)
+
+        self.assertIn(escape(self.bundle_partner_1.company_name), content)
+        self.assertIn(escape(self.proxy_partner_1.company_name), content)
+        self.assertIn(escape(self.proxy_partner_2.company_name), content)
+
+    def test_collection_show_waitlisted_badge(self):
+        """
+        Tests that the Waitlisted badge is shown because the authorization has expired
+        """
+        waitlisted_partner = PartnerFactory(
+            authorization_method=Partner.PROXY, status=Partner.WAITLIST
+        )
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=waitlisted_partner,
+            sent_by=self.user_coordinator,
+        )
+
+        someday = date.today() - timedelta(days=60)
+        authorization = Authorization.objects.get(
+            user=self.editor.user, partners=waitlisted_partner
+        )
+        authorization.date_expires = someday
+        authorization.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(waitlisted_partner.company_name), content)
+        self.assertIn("Waitlisted", content)
+
+    def test_collection_dont_show_waitlisted_badge(self):
+        """
+        Tests that the Waitlisted badge is not shown because the authorization has not expired
+        """
+        waitlisted_partner = PartnerFactory(
+            authorization_method=Partner.PROXY, status=Partner.WAITLIST
+        )
+        app_proxy_partner_1 = ApplicationFactory(
+            status=Application.SENT,
+            editor=self.editor,
+            partner=waitlisted_partner,
+            sent_by=self.user_coordinator,
+        )
+
+        someday = date.today() + timedelta(days=60)
+        authorization = Authorization.objects.get(
+            user=self.editor.user, partners=waitlisted_partner
+        )
+        authorization.date_expires = someday
+        authorization.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(waitlisted_partner.company_name), content)
+        self.assertNotIn("Waitlisted", content)
+
+    def test_collection_show_not_available_badge(self):
+        """
+        Tests that the Not Available badge is shown
+        """
+        not_available_partner = PartnerFactory(
+            authorization_method=Partner.PROXY, status=Partner.NOT_AVAILABLE
+        )
+
+        # Make the user staff so they can see unavailable collections
+        self.editor.user.is_staff = True
+        self.editor.user.save()
+        self.editor.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        self.assertIn(escape(not_available_partner.company_name), content)
+        self.assertIn("Not Available", content)
+
+    def test_user_not_eligible_eligibility_modal_shown(self):
+        """
+        Tests that, when a user is not eligible to access the library, the eligibility
+        modal will be shown
+        """
+        # Make the user not eligible so they can see the eligibility modal
+        self.editor.wp_bundle_eligible = False
+        self.editor.save()
+
+        factory = RequestFactory()
+        url = reverse("users:my_library")
+        request = factory.get(url)
+        request.user = self.editor.user
+        response = MyLibraryView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+
+        content = response.render().content.decode("utf-8")
+
+        eligibility_message = "Sorry, your Wikipedia account doesn’t currently qualify to access The Wikipedia Library."
+
+        self.assertIn(eligibility_message, content)

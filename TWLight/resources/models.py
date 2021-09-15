@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-import copy
+import json
+import os
 
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
-from taggit.managers import TaggableManager
-from taggit.models import TagBase, GenericTaggedItemBase
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -15,13 +14,23 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse_lazy, reverse
 from django.db import models
 from django_countries.fields import CountryField
+from django.utils.safestring import mark_safe
 
 from TWLight.resources.helpers import (
     check_for_target_url_duplication_and_generate_error_message,
     get_tags_json_schema,
 )
 
-RESOURCE_LANGUAGES = copy.copy(settings.INTERSECTIONAL_LANGUAGES)
+# Use language autonyms from Wikimedia.
+# We periodically pull:
+# https://raw.githubusercontent.com/wikimedia/language-data/master/data/language-data.json
+# into locale/language-data.json
+language_data_json = open(os.path.join(settings.LOCALE_PATHS[0], "language-data.json"))
+languages = json.loads(language_data_json.read())["languages"]
+RESOURCE_LANGUAGES = []
+for lang_code, lang_data in languages.items():
+    autonym = lang_data[-1]
+    RESOURCE_LANGUAGES += [(lang_code, autonym)]
 
 RESOURCE_LANGUAGE_CODES = [lang[0] for lang in RESOURCE_LANGUAGES]
 
@@ -34,45 +43,10 @@ def validate_language_code(code):
     if code not in RESOURCE_LANGUAGE_CODES:
         raise ValidationError(
             "%(code)s is not a valid language code. You must enter an ISO "
-            "language code, as in the INTERSECTIONAL_LANGUAGES setting at "
+            "language code, as in the LANGUAGES setting at "
             "https://github.com/WikipediaLibrary/TWLight/blob/master/TWLight/settings/base.py",
             params={"code": code},
         )
-
-
-class TextFieldTag(TagBase):
-    """
-    We're defining a custom tag here the following reasons:
-    * Without doing so, the migrations that define our tags end up in the taggit
-      apps migration folder instead of ours, making version control difficult.
-    * So we can use a non-unique Text field for the tag name. This is done to
-      prevent indexing, because translations can cause the number of indexes to
-      exceed the limits of any storage engine available to MySQL/MariaDB.
-      Avoiding indexes has consequences.
-    Docs here: https://django-taggit.readthedocs.io/en/latest/custom_tagging.html#using-a-custom-tag-or-through-model
-    """
-
-    name = models.TextField(verbose_name="Name", unique=False, max_length=100)
-    slug = models.SlugField(verbose_name="Slug", unique=True, max_length=100)
-    meta_url = models.URLField(
-        blank=True,
-        null=True,
-        help_text="Link to Meta-Wiki "
-        "(eg.: https://meta.wikimedia.org/wiki/The_Wikipedia_Library/Collections/Agroforestry) "
-        "for additional information for this tag.",
-    )
-
-    class Meta:
-        verbose_name = "Tag"
-        verbose_name_plural = "Tags"
-
-
-class TaggedTextField(GenericTaggedItemBase):
-    tag = models.ForeignKey(
-        TextFieldTag,
-        related_name="%(app_label)s_%(class)s_items",
-        on_delete=models.CASCADE,
-    )
 
 
 class Language(models.Model):
@@ -101,7 +75,7 @@ class Language(models.Model):
 
     language = models.CharField(
         choices=RESOURCE_LANGUAGES,
-        max_length=8,
+        max_length=12,
         validators=[validate_language_code],
         unique=True,
     )
@@ -305,10 +279,14 @@ class Partner(models.Model):
         "Entered as &ltdays hours:minutes:seconds&gt.",
     )
 
-    tags = TaggableManager(through=TaggedTextField, blank=True)
-
     # New tag model that uses JSONField instead of Taggit to make tags translatable
-    new_tags = models.JSONField(null=True, default=None, blank=True)
+
+    new_tags = models.JSONField(
+        null=True,
+        default=None,
+        blank=True,
+        help_text="Tag must be a valid JSON schema. Tag should be in the form of tag-name_tag.",
+    )
 
     # Non-universal form fields
     # --------------------------------------------------------------------------
@@ -435,11 +413,6 @@ class Partner(models.Model):
             if not self.target_url:
                 raise ValidationError("Proxy and Bundle partners require a target URL.")
 
-    def get_absolute_url(self):
-        return reverse_lazy("partners:detail", kwargs={"pk": self.pk})
-
-    def save(self, *args, **kwargs):
-        super(Partner, self).save(*args, **kwargs)
         # If new_tags is not empty, validate with JSONSchema
         if self.new_tags is not None:
             try:
@@ -449,8 +422,13 @@ class Partner(models.Model):
                 )
             except JSONSchemaValidationError:
                 raise ValidationError(
-                    "Error trying to insert a tag: the JSON is invalid"
+                    mark_safe(
+                        "Error trying to insert a tag: please choose a tag from <a rel='noopener' target='_blank' href='https://github.com/WikipediaLibrary/TWLight/blob/production/locale/en/tag_names.json'>tag_names.json</a>."
+                    )
                 )
+
+    def get_absolute_url(self):
+        return reverse_lazy("partners:detail", kwargs={"pk": self.pk})
 
     @property
     def get_languages(self):

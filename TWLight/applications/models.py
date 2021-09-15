@@ -58,7 +58,7 @@ class Application(models.Model):
         (APPROVED, _("Approved")),
         # Translators: This is the status of an application which has been declined by a reviewer.
         (NOT_APPROVED, _("Not approved")),
-        # Translators: This is the status of an application that has been finalised, such as by sending to a partner.
+        # Translators: This is the status of an application that has been sent to a partner upon approval.
         (SENT, _("Sent to partner")),
         # Translators: This is the status of an application that has been marked as invalid, therefore not as such declined.
         (INVALID, _("Invalid")),
@@ -123,14 +123,14 @@ class Application(models.Model):
     account_email = models.EmailField(blank=True, null=True)
 
     REQUESTED_ACCESS_DURATION_CHOICES = (
-        # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 12 months in this case.
-        (12, _("12 months")),
-        # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 6 months in this case.
-        (6, _("6 months")),
-        # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 3 months in this case.
-        (3, _("3 months")),
         # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 1 month in this case.
         (1, _("1 month")),
+        # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 3 months in this case.
+        (3, _("3 months")),
+        # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 6 months in this case.
+        (6, _("6 months")),
+        # Translators: One of four choices users can choose from as the preferred duration of how long they would like their access to a particular resource to last. 12 months in this case.
+        (12, _("12 months")),
     )
 
     requested_access_duration = models.IntegerField(
@@ -156,6 +156,17 @@ class Application(models.Model):
 
     def get_absolute_url(self):
         return reverse_lazy("applications:evaluate", kwargs={"pk": self.pk})
+
+    def get_status_display(self):
+
+        if (
+            self.status == self.SENT
+            and self.partner.authorization_method != self.partner.EMAIL
+        ):
+            # Translators: This is the status of an application that has been finalized upon approval.
+            return _("Finalized")
+
+        return self.STATUS_CHOICES[self.status][1]
 
     # Every single save to this model should create a revision.
     # You can access two models this way: REVISIONS and VERSIONS.

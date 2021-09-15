@@ -1,5 +1,5 @@
 from django.conf import settings
-
+from numbers import Number
 import json
 import os
 
@@ -193,9 +193,43 @@ def get_tag_choices(language_code: str = "en"):
 
         tag_choices.append(tag_tuple)
 
+    tag_choices.sort(key=lambda a: a[1])
+
     TAG_CHOICES = tuple(tag_choices)
 
     return TAG_CHOICES
+
+
+def get_tag_dict(language_code: str = "en"):
+    """
+    Function that gets all the tags in the form of a dictionary, preferably
+    translated to the user's preferred language, otherwise the default language
+
+    Parameters
+    ----------
+    language_code: str
+        The language code the user has selected on TWL's settings
+
+    Returns
+    -------
+    dict
+    """
+    tag_dict = {}
+    sorted_tags = {}
+    tag_names_default = _read_translation_file("en", "tag_names")
+    tag_names_lang = _read_translation_file(language_code, "tag_names")
+
+    for tag_key, tag_value in tag_names_default.items():
+        lang_keys = tag_names_lang.keys()
+        if tag_key in lang_keys:
+            tag_dict[tag_key] = tag_names_lang[tag_key]
+        else:
+            tag_dict[tag_key] = tag_value
+
+    sorted_tuples = sorted(tag_dict.items(), key=lambda item: item[1])
+    sorted_tags = {k: v for k, v in sorted_tuples}
+
+    return sorted_tags
 
 
 def _read_translation_file(language_code: str, filename: str):
@@ -286,3 +320,28 @@ def get_tags_json_schema():
     }
 
     return JSON_SCHEMA_TAGS
+
+
+def get_median(values_list):
+    """Given a list (of numbers), returns its median value."""
+    try:
+        for item in values_list:
+            assert isinstance(item, Number)
+    except AssertionError:
+        return 0
+
+    values_list.sort()
+    list_len = len(values_list)
+
+    if list_len < 1:
+        # Mathematically bogus, but will make graph display correctly.
+        median = 0
+    elif list_len % 2 == 1:
+        median = int(values_list[(list_len - 1) // 2])
+    else:
+        median = int(
+            (values_list[(list_len - 1) // 2] + values_list[1 + (list_len - 1) // 2])
+            // 2
+        )
+
+    return median

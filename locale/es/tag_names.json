@@ -1,0 +1,24 @@
+{
+	"@metadata": {
+		"authors": [
+			"Agent",
+			"Suecarmol"
+		]
+	},
+	"languages-and-literature_tag": "Lenguas y Literatura",
+	"multidisciplinary_tag": "Multidisciplinario",
+	"physical-sciences_tag": "Ciencias Físicas",
+	"music_tag": "Música",
+	"art_tag": "Arte",
+	"business-and-economics_tag": "Negocios y Economía",
+	"law_tag": "Leyes",
+	"education_tag": "Educación",
+	"philosophy-and-religion_tag": "Filosofía y Religión",
+	"social-sciences_tag": "Ciencias Sociales",
+	"history_tag": "Historia",
+	"culture_tag": "Cultura",
+	"life-sciences_tag": "Ciencias de la Vida",
+	"health-sciences_tag": "Ciencias de la Salud",
+	"earth-sciences_tag": "Ciencias de la Tierra",
+	"technology_tag": "Tecnología"
+}

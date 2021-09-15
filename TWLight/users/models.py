@@ -33,7 +33,6 @@ from datetime import datetime, date, timedelta
 import json
 import logging
 import urllib.request, urllib.error, urllib.parse
-import urllib.request, urllib.parse, urllib.error
 from annoying.functions import get_object_or_None
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -646,11 +645,10 @@ class Editor(models.Model):
             )
             self.wp_not_blocked = editor_not_blocked(global_userinfo["merged"])
 
-        if self.wp_registered is None:
-            self.wp_registered = editor_reg_date(identity, global_userinfo)
         # if the account is already old enough, we shouldn't run this check everytime
         # since this flag should never return back to False
-        if not self.wp_account_old_enough:
+        if self.wp_registered is None or not self.wp_account_old_enough:
+            self.wp_registered = editor_reg_date(identity, global_userinfo)
             self.wp_account_old_enough = editor_account_old_enough(self.wp_registered)
 
         self.wp_enough_edits = editor_enough_edits(self.wp_editcount)

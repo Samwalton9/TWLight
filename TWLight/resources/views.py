@@ -13,14 +13,13 @@ from django.shortcuts import get_object_or_404
 
 from TWLight.applications.helpers import count_valid_authorizations
 from TWLight.applications.models import Application
-from TWLight.graphs.helpers import get_median
 from TWLight.users.models import Authorization
 from TWLight.view_mixins import CoordinatorsOnly, PartnerCoordinatorOrSelf, EditorsOnly
 
 from .filters import PartnerFilter
 from .forms import SuggestionForm
-from .helpers import get_partner_description, get_tag_names
-from .models import Partner, Stream, Suggestion, TextFieldTag
+from .helpers import get_partner_description, get_tag_names, get_median
+from .models import Partner, Stream, Suggestion
 
 import logging
 
@@ -102,14 +101,6 @@ class PartnersFilterView(ListView):
             partners_list.append(partner_dict)
 
         context["partners_list"] = partners_list
-
-        try:
-            filter_data = partner_filtered_list.form.data
-            tag_id = filter_data.get("tags")
-            if tag_id:
-                context["tag"] = TextFieldTag.objects.get(id=tag_id)
-        except (KeyError, ValueError, TextFieldTag.DoesNotExist):
-            pass
 
         return context
 

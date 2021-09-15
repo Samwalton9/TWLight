@@ -33,7 +33,7 @@ urlpatterns = [
     ),
     url(
         r"^my_library/$",
-        login_required(views.CollectionUserView.as_view()),
+        login_required(views.MyLibraryView.as_view()),
         name="my_library",
     ),
     url(

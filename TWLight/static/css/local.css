@@ -2,6 +2,18 @@
 ----------------------------------------------------------------------------
 BODY
 --------------------------------------------------------------------------*/
+@font-face {
+  font-family: 'Roboto';
+  src: local('Roboto'),
+       url('../fonts/Roboto-Regular.ttf') format("truetype");
+}
+
+@font-face {
+  font-family: 'Roboto-Light';
+  src: local('Roboto-Light'),
+       url('../fonts/Roboto-Light.ttf') format("truetype");
+}
+
 html {
   position: relative;
   min-height: 100%;
@@ -151,16 +163,35 @@ header {
 }
 
 .site-title {
-	font-family: Palatino; 
-	font-size:1.5em; 
-	font-weight:bold; 
-	margin: -10px 0px 10px 0px; 
-	color:#000000;
+	font-family: Roboto;
+	font-size: 16px;
+	font-weight: 700;
+    width: 230px;
+	padding: 0px 0px 0px 0px;
+	color: #000000 !important;
+    vertical-align: -moz-middle-with-baseline;
+    vertical-align: middle;
+    vertical-align: -webkit-baseline-middle;
+}
+
+.site-title:hover{
+    color: #000000 !important;
+}
+
+.logo-header {
+	height: 70px;
+	float: left;
+    padding: 0px 25px 20px 0px;
+}
+
+.twl-toggle-button{
+    border-color: #f8f8f8 !important;
+    margin: 20px 0px 0px 0px;
 }
 
 .logo {
-	height:70px; 
-	float:left; 
+	height:70px;
+	float:left;
 	padding:5px 20px 5px 0px;
 }
 
@@ -204,17 +235,52 @@ header {
 
 
 #top-nav {
-  border-bottom: 1px solid #eee;
   margin-bottom: 20px;
+  background-color: #f8f8f8;
 }
 
 #footer {
   background-color: #f8f8f8;
-  border-top: 1px solid #eee;
-  padding: 20px 40px 15px 40px;
+  border-top: 2px solid #eee;
+  padding: 10px 40px 5px 40px;
   position: absolute;
   bottom: 0;
   width: 100%;
+}
+
+.footer-element{
+    text-decoration: none;
+    font-size: 16px;
+    color: #000;
+}
+
+.footer-element:hover{
+    color: #3366CC;
+}
+
+.mobile-menu {
+    padding: 10px 0px 10px 0px;
+    vertical-align: -moz-middle-with-baseline;
+    vertical-align: -webkit-baseline-middle;
+    vertical-align: middle;
+}
+
+.nav-links {
+    font-family: Roboto;
+    color: black !important;
+    font-size: 14px;
+}
+
+.user-button {
+    font-family: Roboto;
+    color: #FFFFFF !important;
+    background-color: #3366CC !important;
+}
+
+.user-button:hover {
+    color: #FFFFFF !important;
+    background-color: #3366CC !important;
+    text-decoration: underline !important;
 }
 
 @media (max-width:300px){
@@ -236,7 +302,7 @@ nav .divider {
 
 .navbar-left {
 	height:78px;
-	padding-top:5px; 
+	padding-top:5px;
 }
 
 @media (max-width: 767px) {
@@ -245,25 +311,25 @@ nav .divider {
   }
 
   li.mobile-menu {
-	font-size:.9em;	
+	font-size:.9em;
 }
 }
 
 /* Portrait phones and smaller */
 @media (max-width: 480px) {
-.site-title {
-	font-family: Palatino; 
-	font-size:.9em; 
-	font-weight:bold; 
-	margin: -10px 0px 10px 0px; 
-	color:#000000;
-}
+    .twl-brand{
+        height: 80px;
+        padding: 15px 0px 0px 0px;
+    }
 
-.logo {
-	height:50px; 
-	float:left; 
-	padding:0px 10px 0px 0px;
-}
+    .site-title {
+    	display: none;
+    }
+
+    .logo-header {
+        height: 55px;
+        padding: 0px 10px 0px 0px;
+    }
 }
 
 /*
@@ -364,7 +430,7 @@ div.panel-body form.form-inline input#submit-id-submit.btn.btn-default {
   padding: .15em .6em;
   letter-spacing: 0.25px;
   font-weight: 500;
-  margin-top: 5px; 
+  margin-top: 5px;
 }
 
 .resource-label {
@@ -555,17 +621,6 @@ A few spots just need padding instead of margin.
   min-height:350px;
 }
 
-.border-homepage {
-  padding-left: 25px;
-  padding-right: 25px;
-}
-
-.read-more {
-  width:200px;
-  margin:0 auto 10px auto;
-  text-align:center;
-}
-
 .block-notice {
     padding: 0 10% 2em 10%;
     color: #df2e32;
@@ -651,12 +706,12 @@ A few spots just need padding instead of margin.
 }
 
 li.mobile-menu {
-  width:150px;
-  font-size:.9em;
+  width: 150px;
 }
 
  .nav li a {
    padding: 5px;
+   color: #00000;
  }
 
 .navbar-left {
@@ -781,5 +836,3 @@ CLEARING COLUMNS
   background-color: #333;
   color: #fff;
 }
-
-

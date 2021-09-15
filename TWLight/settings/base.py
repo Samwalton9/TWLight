@@ -22,13 +22,11 @@ https://docs.djangoproject.com/en/1.7/ref/settings/
 import os
 import json
 
-# Importing global settings is typically not recommended, and un-Django-like,
-# but we're doing something interesting with the LANGUAGES setting.
-from django.conf.global_settings import LANGUAGES as GLOBAL_LANGUAGES
 from django.contrib import messages
 
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import to_language
 
 # Import available locales from Faker, so we can determine what languages we fake in tests.
 from faker.config import AVAILABLE_LOCALES as FAKER_AVAILABLE_LOCALES
@@ -47,31 +45,20 @@ TWLIGHT_ENV = os.environ.get("TWLIGHT_ENV")
 # An atypical way of setting django languages for TranslateWiki integration:
 # https://translatewiki.net/wiki/Thread:Support/_The_following_issue_is_unconfirmed,_still_to_be_investigated._Adding_TheWikipediaLibrary_Card_Platform_TranslateWiki
 
-# Returns the intersectional language codes between Django and Wikimedia CLDR
-# along with the language autonyms from Wikimedia CLDR.
-# https://github.com/wikimedia/language-data
-def get_django_cldr_languages_intersection(dir):
-    languages_intersection = []
-    language_data_json = open(os.path.join(dir, "language-data.json"))
-    languages = json.loads(language_data_json.read())["languages"]
-    for lang_code, lang_data in languages.items():
-        for i, (djlang_code, djlang_name) in enumerate(GLOBAL_LANGUAGES):
-            if lang_code == djlang_code:
-                autonym = lang_data[-1]
-                languages_intersection += [(lang_code, autonym)]
-    return sorted(set(languages_intersection))
-
-
 # Get the language codes from the locale directories, and compare them to the
-# intersecting set of languages between Django and Wikimedia CLDR.
-# Use langauge autonyms from Wikimedia.
+# languages in Wikimedia CLDR. Use langauge autonyms from Wikimedia.
+# We periodically pull:
+# https://raw.githubusercontent.com/wikimedia/language-data/master/data/language-data.json
+# into locale/language-data.json
 def get_languages_from_locale_subdirectories(dir):
     current_languages = []
-    languages_intersection = INTERSECTIONAL_LANGUAGES
+    language_data_json = open(os.path.join(dir, "language-data.json"))
+    languages = json.loads(language_data_json.read())["languages"]
     for locale_dir in os.listdir(dir):
         if os.path.isdir(os.path.join(dir, locale_dir)):
-            for i, (lang_code, autonym) in enumerate(languages_intersection):
-                if locale_dir == lang_code:
+            for lang_code, lang_data in languages.items():
+                autonym = lang_data[-1]
+                if to_language(locale_dir) == lang_code:
                     current_languages += [(lang_code, autonym)]
     return sorted(set(current_languages))
 
@@ -121,10 +108,6 @@ THIRD_PARTY_APPS = [
     "django_cron",
     "django_filters",
     "modeltranslation",
-    "taggit",
-    # DO NOT CONFUSE THIS with requests, the Python URL library! This is
-    # django-request, the user analytics package.
-    "request",
     "django_countries",
     "rest_framework",
     "rest_framework.authtoken",
@@ -137,7 +120,6 @@ TWLIGHT_APPS = [
     "TWLight.resources",
     "TWLight.applications",
     "TWLight.emails",
-    "TWLight.graphs",
     "TWLight.comments",
     "TWLight.api",
     "TWLight.ezproxy",
@@ -268,9 +250,8 @@ LOCALE_PATHS = [
 # available to the system. This keeps our column and index count for db-stored
 # translations as low as possible while allowing translatewiki contributions to
 # be used without reconfiguring the site.
-INTERSECTIONAL_LANGUAGES = get_django_cldr_languages_intersection(LOCALE_PATHS[0])
 LANGUAGES = get_languages_from_locale_subdirectories(LOCALE_PATHS[0])
-FAKER_LOCALES = get_django_faker_languages_intersection(INTERSECTIONAL_LANGUAGES)
+FAKER_LOCALES = get_django_faker_languages_intersection(LANGUAGES)
 
 TIME_ZONE = "UTC"
 
@@ -371,10 +352,6 @@ TWLIGHT_API_PROVIDER_ENDPOINT = os.environ.get("TWLIGHT_API_PROVIDER_ENDPOINT", 
 # ------------------------------------------------------------------------------
 COMMENTS_APP = "TWLight.comments"
 
-# TAGGIT CONFIGURATION
-# ------------------------------------------------------------------------------
-TAGGIT_CASE_INSENSITIVE = True
-
 # REVERSION CONFIGURATION
 # ------------------------------------------------------------------------------
 
@@ -399,20 +376,6 @@ EMAIL_HOST_PASSWORD = ""
 EMAIL_USE_TLS = False
 
 INSTALLED_APPS += ["djmail"]
-
-
-# DJANGO_REQUEST CONFIGURATION
-# ------------------------------------------------------------------------------
-
-MIDDLEWARE += ["request.middleware.RequestMiddleware"]
-
-# The following are set for privacy purposes. Note that, if some amount of
-# geographic tracking is desired, there is a REQUEST_ANONYMOUS_IP setting which
-# scrubs the last octet of the IP address, which could be used instead of
-# REQUEST_LOG_IP. There is not a way to get semi-granular user tracking (such
-# as tracking only authenticated vs anonymous users).
-REQUEST_LOG_IP = False
-REQUEST_LOG_USER = False
 
 # LOGGING CONFIGURATION
 # ------------------------------------------------------------------------------

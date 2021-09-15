@@ -15,8 +15,6 @@ from django.views.decorators.cache import cache_page
 from TWLight.api.urls import urlpatterns as api_urls
 from TWLight.applications.urls import urlpatterns as applications_urls
 from TWLight.emails.views import ContactUsView
-from TWLight.graphs.urls import csv_urlpatterns as csv_urls
-from TWLight.graphs.views import DashboardView
 from TWLight.resources.urls import urlpatterns as partners_urls
 from TWLight.resources.views import (
     PartnerSuggestionView,
@@ -28,7 +26,7 @@ from TWLight.users.urls import urlpatterns as users_urls
 from TWLight.users.views import TermsView
 from TWLight.ezproxy.urls import urlpatterns as ezproxy_urls
 
-from .views import LanguageWhiteListView, HomePageView
+from .views import NewHomePageView
 
 handler400 = "TWLight.views.bad_request"
 
@@ -67,12 +65,10 @@ urlpatterns = [
         include((applications_urls, "applications"), namespace="applications"),
     ),
     url(r"^partners/", include((partners_urls, "resources"), namespace="partners")),
-    url(r"^csv/", include((csv_urls, "graphs"), namespace="csv")),
     url(r"^ezproxy/", include((ezproxy_urls, "ezproxy"), namespace="ezproxy")),
     # Other TWLight views
     url(r"^oauth/login/$", auth.OAuthInitializeView.as_view(), name="oauth_login"),
     url(r"^oauth/callback/$", auth.OAuthCallbackView.as_view(), name="oauth_callback"),
-    url(r"^dashboard/$", DashboardView.as_view(), name="dashboard"),
     url(r"^terms/$", TermsView.as_view(), name="terms"),
     # For partner suggestions
     url(r"^suggest/$", PartnerSuggestionView.as_view(), name="suggest"),
@@ -88,12 +84,6 @@ urlpatterns = [
     ),
     # For contact us form
     url(r"^contact/$", ContactUsView.as_view(), name="contact"),
-    # Cached for 24 hours.
-    url(
-        r"^i18n-whitelist$",
-        cache_page(86400)(LanguageWhiteListView.as_view()),
-        name="i18n_whitelist",
-    ),
-    url(r"^$", HomePageView.as_view(), name="homepage"),
+    url(r"^$", NewHomePageView.as_view(), name="homepage"),
     url(r"^about/$", TemplateView.as_view(template_name="about.html"), name="about"),
 ]

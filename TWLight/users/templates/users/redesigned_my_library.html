@@ -1,0 +1,45 @@
+{% extends "new_base.html" %}
+{% load i18n %}
+
+{% block content %}
+  {% include "header_partial_b4.html" %}
+
+  {% if not editor.wp_bundle_eligible %}
+    {% include "users/eligibility_modal.html" %}
+  {% endif %}
+
+  <div class="alert alert-dark text-center" role="alert">
+    {% comment %}Translators: This message invites users to give feedback on the new My Library UI.{% endcomment %}
+    {% blocktranslate trimmed %}
+    We're in the process of redesigning the library - further changes will be made
+    over the coming weeks! We would love to hear your thoughts and feedback on our
+    <a href="https://meta.wikimedia.org/wiki/Talk:Library_Card_platform/Design_improvements"
+        class="alert-link" target="_blank" rel="noopener">
+      project page
+    </a>
+    .
+    {% endblocktranslate %}
+  </div>
+  <div class="row">
+    <div class="col-lg-2 col-md-3">
+      {% include "users/filter_section.html" %}
+    </div>
+    <div class="v-divider"></div>
+    <div class="col-lg-9 col-md-8 col-sm-12">
+      {% include "users/collections_section.html" %}
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block javascript %}
+  <script type="text/javascript">
+    // Dynamically add classes to the django-filter generated labels
+    labelLanguages = document.querySelector("[for=id_languages]")
+    labelTags = document.querySelector("[for=id_tags]")
+
+    labelLanguages.classList.add("collection-filter-label");
+    labelTags.classList.add("collection-filter-label");
+  </script>
+
+{% endblock %}
